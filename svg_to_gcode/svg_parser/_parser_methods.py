@@ -120,5 +120,5 @@ def parse_file(file_path: str, transform_origin=True, canvas_height=None, draw_h
     root = ElementTree.parse(file_path).getroot()
     height_str = root.get("height")
     if height_str is None and canvas_height is None:
-        canvas_height = svg_height(file_path)[:-2]
+        canvas_height = svg_height(file_path)
     return parse_root(root, canvas_height, transform_origin, draw_hidden)
