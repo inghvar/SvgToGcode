@@ -37,6 +37,12 @@ class Gcode(Interface):
         command = "G1"
 
         if self._current_speed != self._next_speed:
+            if self._current_speed is None:
+                command = "G0"
+            elif self._next_speed > self._current_speed:
+                command = "G0"
+            else:
+                command = "G1"
             self._current_speed = self._next_speed
             command += f" F{self._current_speed}"
 
