@@ -92,16 +92,42 @@ class Transformation:
 
         self.translation_matrix *= scale_matrix
 
-    def add_rotation(self, angle: float):
-        self.transformation_record.append(("rotate", [angle]))
-
+    def add_rotation(self, angle: float, px=None, py=None):
         angle = math.radians(angle)
-        rotation_matrix = Matrix([
-            [math.cos(angle), -math.sin(angle), 0, 0],
-            [math.sin(angle), math.cos(angle),  0, 0],
-            [0,               0,                1, 0],
-            [0,               0,                0, 1]
-        ])
+        # if pivot point coordinate
+        # https://stackoverflow.com/questions/14660796/how-to-calculate-svg-transform-matrix-from-rotation-with-pivot-point
+        # https://www.w3.org/TR/SVG-Transforms/
+        # https://docs.aspose.com/svg/net/drawing-basics/transformation-matrix/
+        if px and py:
+            self.transformation_record.append(("rotate", [angle, px, py]))
+            translation_matrix_1 = Matrix([
+                [1, 0, 0, px],
+                [0, 1, 0, py],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]
+            ])
+            rotation_matrix = Matrix([
+                [math.cos(angle), -math.sin(angle), 0, 0],
+                [math.sin(angle), math.cos(angle),  0, 0],
+                [0,               0,                1, 0],
+                [0,               0,                0, 1]
+            ])
+            net_matrix = translation_matrix_1 * rotation_matrix
+            translation_matrix_2 = Matrix([
+                [1, 0, 0, -px],
+                [0, 1, 0, -py],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]
+            ])
+            rotation_matrix =  net_matrix * translation_matrix_2
+        else:
+            self.transformation_record.append(("rotate", [angle]))
+            rotation_matrix = Matrix([
+                [math.cos(angle), -math.sin(angle), 0, 0],
+                [math.sin(angle), math.cos(angle),  0, 0],
+                [0,               0,                1, 0],
+                [0,               0,                0, 1]
+            ])
 
         self.translation_matrix *= rotation_matrix
 
