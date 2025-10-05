@@ -114,7 +114,7 @@ class Compiler:
 
             code = [self.interface.laser_off(), self.interface.set_movement_speed(self.movement_speed),
                     self.interface.linear_move(start.x, start.y), self.interface.set_movement_speed(self.cutting_speed),
-                    self.interface.set_laser_power(1)]
+                    self.interface.set_laser_power()]
 
             if self.dwell_time > 0:
                 code = [self.interface.dwell(self.dwell_time)] + code
