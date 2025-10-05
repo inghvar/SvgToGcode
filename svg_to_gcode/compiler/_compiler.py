@@ -48,7 +48,7 @@ class Compiler:
         self.footer = custom_footer
         self.body = []
 
-    def compile(self, passes=1):
+    def compile(self, passes):
 
         """
         Assembles the code in the header, body and footer, saving it to a file.
@@ -83,7 +83,7 @@ class Compiler:
 
         return '\n'.join(gcode)
 
-    def compile_to_file(self, file_name: str, passes=1):
+    def compile_to_file(self, file_name: str, passes):
         """
         A wrapper for the self.compile method. Assembles the code in the header, body and footer, saving it to a file.
 
