@@ -1,4 +1,5 @@
 import math
+import re
 import warnings
 
 from typing import List
@@ -53,6 +54,9 @@ class Path:
         command_arguments = []  # A list containing the arguments for the current command_key
 
         number_str = ''  # A buffer used to store numeric characters before conferring them to a number
+
+        # The exponent marker may be uppercase (svgelements writes "1E-06"); the parser only knows "e"
+        d = re.sub(r'(?<=[\d.])E(?=[-+]?\d)', 'e', d)
 
         # Parse each character in d
         i = 0
