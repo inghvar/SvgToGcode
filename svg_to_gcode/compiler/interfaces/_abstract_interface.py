@@ -28,6 +28,19 @@ class Interface:
         """
         raise NotImplementedError("Interface class must implement the linear_move command")
 
+    def arc_move(self, x, y, i, j, clockwise) -> str:
+        """
+        Moves the tool along a circular arc, from the current position to (x, y).
+
+        :param x: The x coordinate of the end point.
+        :param y: The y coordinate of the end point.
+        :param i: The x offset from the current position to the center of the arc.
+        :param j: The y offset from the current position to the center of the arc.
+        :param clockwise: True for a clockwise arc (G2), False for a counter-clockwise arc (G3).
+        :return: Appropriate command.
+        """
+        raise NotImplementedError("Interface class must implement the arc_move command")
+
     def laser_off(self) -> str:
         """
         Powers off the laser beam.
