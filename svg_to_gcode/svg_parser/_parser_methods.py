@@ -83,7 +83,7 @@ def parse_root(root: ElementTree.Element, canvas_height, transform_origin=True, 
                 curves.extend(path.curves)
 
         # Continue the recursion
-        curves.extend(parse_root(element, transform_origin, canvas_height, draw_hidden, visible, transformation))
+        curves.extend(parse_root(element, canvas_height, transform_origin, draw_hidden, visible, transformation))
 
     # ToDo implement shapes class
     return curves
@@ -102,7 +102,7 @@ def parse_string(svg_string: str, transform_origin=True, canvas_height=None, dra
         :return: A list of geometric curves describing the svg. Use the Compiler sub-module to compile them to gcode.
     """
     root = ElementTree.fromstring(svg_string)
-    return parse_root(root, transform_origin, canvas_height, draw_hidden)
+    return parse_root(root, canvas_height, transform_origin, draw_hidden)
 
 
 def parse_file(file_path: str, transform_origin=True, canvas_height=None, draw_hidden=False) -> List[Curve]:
