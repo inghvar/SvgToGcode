@@ -2,8 +2,8 @@ import typing
 import warnings
 
 from svg_to_gcode.compiler.interfaces import Interface
-from svg_to_gcode.geometry import Curve, Line
-from svg_to_gcode.geometry import LineSegmentChain
+from svg_to_gcode.geometry import Curve, CircularArc
+from svg_to_gcode.geometry import LineSegmentChain, SmoothArcChain
 from svg_to_gcode import UNITS, TOLERANCES
 
 
@@ -14,7 +14,7 @@ class Compiler:
     """
 
     def __init__(self, interface_class: typing.Type[Interface], movement_speed, cutting_speed, pass_depth,
-                 dwell_time=0, unit=None, custom_header=None, custom_footer=None):
+                 dwell_time=0, unit=None, custom_header=None, custom_footer=None, laser_power=1):
         """
 
         :param interface_class: Specify which interface to use. The most common is the gcode interface.
@@ -25,12 +25,19 @@ class Compiler:
         :param unit: specify a unit to the machine
         :param custom_header: A list of commands to be executed before all generated commands. Default is [laser_off,]
         :param custom_footer: A list of commands to be executed after all generated commands. Default is [laser_off,]
+        :param laser_power: the power of the laser when cutting, between 0 and 1 (the interface scales it to the machine).
+        It is passed to interface.set_laser_power() every time the laser is turned on. Default is full power.
         """
         self.interface = interface_class()
         self.movement_speed = movement_speed
         self.cutting_speed = cutting_speed
         self.pass_depth = abs(pass_depth)
         self.dwell_time = dwell_time
+
+        if not 0 <= laser_power <= 1:
+            raise ValueError(f"{laser_power} is out of bounds. Laser power must be given between 0 and 1.")
+
+        self.laser_power = laser_power
 
         if (unit is not None) and (unit not in UNITS):
             raise ValueError(f"Unknown unit {unit}. Please specify one of the following: {UNITS}")
@@ -95,6 +102,25 @@ class Compiler:
         with open(file_name, 'w') as file:
             file.write(self.compile(passes=passes))
 
+    def _move_to_start(self, start):
+        """
+        Returns the commands that bring the tool to the start of a new chain: turn off the laser, rapid move to the
+        start, then switch to the cutting speed and turn the laser on. If the tool is already at the start, nothing
+        is needed (no dwell and no laser off), so consecutive connected chains are cut in one go.
+        """
+
+        if self.interface.position is not None and abs(self.interface.position - start) <= TOLERANCES["operation"]:
+            return []
+
+        code = [self.interface.laser_off(), self.interface.set_movement_speed(self.movement_speed),
+                self.interface.linear_move(start.x, start.y), self.interface.set_movement_speed(self.cutting_speed),
+                self.interface.set_laser_power(self.laser_power)]
+
+        if self.dwell_time > 0:
+            code = [self.interface.dwell(self.dwell_time)] + code
+
+        return code
+
     def append_line_chain(self, line_chain: LineSegmentChain):
         """
         Draws a LineSegmentChain by calling interface.linear_move() for each segment. The resulting code is appended to
@@ -105,36 +131,40 @@ class Compiler:
             warnings.warn("Attempted to parse empty LineChain")
             return []
 
-        code = []
-
-        start = line_chain.get(0).start
-
-        # Don't dwell and turn off laser if the new start is at the current position
-        if self.interface.position is None or abs(self.interface.position - start) > TOLERANCES["operation"]:
-
-            code = [self.interface.laser_off(), self.interface.set_movement_speed(self.movement_speed),
-                    self.interface.linear_move(start.x, start.y), self.interface.set_movement_speed(self.cutting_speed),
-                    self.interface.set_laser_power()]
-
-            if self.dwell_time > 0:
-                code = [self.interface.dwell(self.dwell_time)] + code
+        code = self._move_to_start(line_chain.get(0).start)
 
         for line in line_chain:
             code.append(self.interface.linear_move(line.end.x, line.end.y))
 
         self.body.extend(code)
 
+    def append_arc_chain(self, arc_chain: SmoothArcChain):
+        """
+        Draws a SmoothArcChain. Every Line is drawn with interface.linear_move() (G1) and every CircularArc with
+        interface.arc_move() (G2/G3). The resulting code is appended to self.body
+        """
+
+        if arc_chain.chain_size() == 0:
+            warnings.warn("Attempted to parse empty ArcChain")
+            return []
+
+        code = self._move_to_start(arc_chain.get(0).start)
+
+        for element in arc_chain:
+            if isinstance(element, CircularArc):
+                # G2/G3 take the center as an offset (I, J) from the start of the arc, not as an absolute point.
+                i, j = element.center_offset()
+                code.append(self.interface.arc_move(element.end.x, element.end.y, i, j, element.clockwise))
+            else:
+                code.append(self.interface.linear_move(element.end.x, element.end.y))
+
+        self.body.extend(code)
+
     def append_curves(self, curves: [typing.Type[Curve]]):
         """
-        Draws curves by approximating them as line segments and calling self.append_line_chain(). The resulting code is
-        appended to self.body
+        Draws curves by approximating them with circular arcs and line-segments (where the curve is nearly straight)
+        and calling self.append_arc_chain(). The resulting code is appended to self.body
         """
 
         for curve in curves:
-            line_chain = LineSegmentChain()
-
-            approximation = LineSegmentChain.line_segment_approximation(curve)
-
-            line_chain.extend(approximation)
-
-            self.append_line_chain(line_chain)
+            self.append_arc_chain(SmoothArcChain.arc_approximation(curve))

@@ -65,6 +65,49 @@ class Gcode(Interface):
 
         return command + ';'
 
+    def arc_move(self, x, y, i, j, clockwise):
+        """
+        Moves the tool along a circular arc with G2 (clockwise) or G3 (counter-clockwise). The arc starts at the current
+        position, ends at (x, y) and its center is at (current position + (i, j)). This is the GRBL 1.1 center format.
+        """
+
+        # An arc needs a known start point to be able to interpret the center offset.
+        if self.position is None:
+            raise ValueError("Unknown position. Move to the start of the arc before calling arc_move.")
+
+        if self._next_speed is None:
+            raise ValueError("Undefined movement speed. Call set_movement_speed before executing movement commands.")
+
+        # GRBL reads the rounded numbers from the gcode, so compare the rounded values: two numbers which differ before
+        # rounding can be equal in the file.
+        same_end = round(x, self.precision) == round(self.position.x, self.precision) and \
+            round(y, self.precision) == round(self.position.y, self.precision)
+        no_center_offset = round(i, self.precision) == 0 and round(j, self.precision) == 0
+
+        # GRBL treats an arc whose end point equals its start point as a full circle, and rejects an arc with a zero
+        # radius. Such arcs are too small to matter, so move in a straight line instead.
+        if same_end or no_center_offset:
+            return self.linear_move(x, y)
+
+        # G2 is a clockwise arc, G3 is a counter-clockwise arc. The offsets I and J are always relative to the start
+        # of the arc. GRBL 1.1 only supports this incremental mode (G91.1, the default), not absolute centers (G90.1).
+        command = "G2" if clockwise else "G3"
+
+        # Only send the feed rate when it changes, as linear_move does.
+        if self._current_speed != self._next_speed:
+            self._current_speed = self._next_speed
+            command += f" F{self._current_speed}"
+
+        command += f" X{x:.{self.precision}f} Y{y:.{self.precision}f}"
+        command += f" I{i:.{self.precision}f} J{j:.{self.precision}f}"
+
+        self.position = Vector(x, y)
+
+        if verbose:
+            print(f"Arc to {x}, {y} around offset {i}, {j}")
+
+        return command + ';'
+
     def laser_off(self):
         return f"M5;"
 
