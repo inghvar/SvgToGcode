@@ -132,6 +132,10 @@ class ArcApproximationTest(unittest.TestCase):
         # A sharp corner: the tangent flips direction, so no single arc fits and the bezier has to be split.
         self.approximate(CubicBazier(Vector(0, 0), Vector(10, 10), Vector(-10, 10), Vector(0, 0.01)))
 
+    def test_parallel_tangents_perpendicular_to_chord(self):
+        # Both end tangents point up while the chord points right: no biarc exists (used to divide by zero).
+        self.approximate(CubicBazier(Vector(0, 0), Vector(10, 0), Vector(0, 10), Vector(10, -10)))
+
     def test_coincident_control_points(self):
         # A control point equal to its end point has no direction, the next control point must be used instead.
         self.approximate(CubicBazier(Vector(0, 0), Vector(0, 0), Vector(10, 5), Vector(10, 5)))

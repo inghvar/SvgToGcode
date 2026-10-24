@@ -226,7 +226,14 @@ def _biarc(bezier: CubicBazier):
     # Both forms are the positive root. The first avoids dividing by zero when the tangents are parallel, the second
     # avoids cancellation when the chord points against the tangents.
     if projection >= 0:
-        d = (chord * chord) / (projection + discriminant)
+        denominator = projection + discriminant
+
+        # Both terms vanish when the tangents are parallel and perpendicular to the chord (an S-shaped bezier). Then
+        # the root doesn't exist, so a biarc is impossible. The caller splits the bezier.
+        if denominator < _EPSILON:
+            return None
+
+        d = (chord * chord) / denominator
     elif quadratic > _EPSILON:
         d = (discriminant - projection) / quadratic
     else:
